@@ -1,10 +1,10 @@
 //go:build darwin || windows
 
-// Command analyze is the disk explorer behind `mo analyze`.
 package main
 
 import "github.com/tw93/mole/internal/analyze"
 
-func main() {
+func runAnalyze() int {
 	analyze.Main()
+	return 0
 }

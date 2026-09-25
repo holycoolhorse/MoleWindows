@@ -44,7 +44,7 @@ If Homebrew no longer supports your macOS version, use the script below instead.
 curl -fsSL https://raw.githubusercontent.com/tw93/mole/main/install.sh | bash
 ```
 
-Mole is built for macOS. An experimental Windows version lives in the [windows branch](https://github.com/tw93/Mole/tree/windows).
+Mole is built for macOS. On Windows, `mole.exe` provides `analyze` and `status`; see [README_WINDOWS.md](README_WINDOWS.md). An older experimental Windows version lives in the upstream [windows branch](https://github.com/tw93/Mole/tree/windows).
 
 **Run**
 

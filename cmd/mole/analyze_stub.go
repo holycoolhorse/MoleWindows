@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-func main() {
+func runAnalyze() int {
 	fmt.Fprintln(os.Stderr, "analyze is only supported on macOS and Windows")
-	os.Exit(1)
+	return 1
 }

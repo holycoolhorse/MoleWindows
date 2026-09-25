@@ -1,0 +1,46 @@
+name: Windows
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Go (windows-latest)
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        env:
+          # Exercise the real SHFileOperationW call against a temp file.
+          MOLE_TEST_REAL_RECYCLE_BIN: "1"
+        run: go test ./...
+
+      - name: Build mole.exe
+        run: |
+          go build -o mole.exe ./cmd/mole
+          ./mole.exe --version
+          ./mole.exe status --json > status.json
+          ./mole.exe analyze --json "$env:RUNNER_TEMP" > analyze.json
+          Get-Content status.json | ConvertFrom-Json | Out-Null
+          Get-Content analyze.json | ConvertFrom-Json | Out-Null

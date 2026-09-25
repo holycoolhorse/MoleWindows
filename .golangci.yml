@@ -64,6 +64,13 @@ linters:
           - errcheck
           - gosec
           - unparam
+      # Win32 calls without an x/sys wrapper (SHFileOperationW,
+      # SHQueryRecycleBinW, GetSystemPowerStatus, EnumDisplaySettingsW,
+      # NtQuerySystemInformation) must pass struct pointers through unsafe.
+      - path: _windows\.go
+        text: "G103"
+        linters:
+          - gosec
       # Ignore errors from os.Remove in cleanup code
       - text: "os.Remove"
         linters:

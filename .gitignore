@@ -73,6 +73,7 @@ bin/analyze-go
 bin/status-go
 bin/analyze-darwin-*
 bin/status-darwin-*
+bin/mole-windows-*.exe
 
 # Test artifacts
 tests/tmp-*/
