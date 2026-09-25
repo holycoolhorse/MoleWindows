@@ -211,7 +211,7 @@ func readLiveScanInitialEntries(root string, limiter *scanLimiter) ([]dirEntry, 
 		if err != nil {
 			continue
 		}
-		size, _ := countableFileSize(info, &limiter.seen)
+		size, _ := countableFileSize(fullPath, info, &limiter.seen)
 		totalSize += size
 		totalFiles++
 		entries = append(entries, dirEntry{

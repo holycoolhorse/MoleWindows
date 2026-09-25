@@ -154,8 +154,8 @@ func openPathCommand(ctx context.Context, path string, reveal bool) *exec.Cmd {
 // its full size and subsequent links seen in the same scan count zero. The
 // bool reports whether this call was a deduplicated (zero-counted) hardlink.
 // A nil seen map disables deduplication.
-func countableFileSize(info fs.FileInfo, seen *sync.Map) (int64, bool) {
-	size := getActualFileSize("", info)
+func countableFileSize(path string, info fs.FileInfo, seen *sync.Map) (int64, bool) {
+	size := getActualFileSize(path, info)
 	if seen == nil {
 		return size, false
 	}

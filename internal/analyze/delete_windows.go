@@ -59,25 +59,48 @@ var recycleBinMover = moveToRecycleBin
 // driveTypeForPath is replaceable in tests.
 var driveTypeForPath = recycleBinDriveType
 
-// recycleBinDriveType reports the drive type the shell will see for absPath.
-// The drive letter alone is not enough: a removable volume can be mounted into
-// a folder on C:, and a directory symlink on C: can point at a network share.
-// Both the lexical path and its fully resolved form must sit on a fixed
-// volume; anything that cannot be resolved reports DRIVE_UNKNOWN.
+// GetFinalPathNameByHandleW flags (fileapi.h).
+const (
+	fileNameNormalized = 0x0
+	volumeNameDOS      = 0x0
+	volumeNameGUID     = 0x1
+)
+
+// recycleBinDriveType reports the drive type of the volume that will hold the
+// item in the Recycle Bin, which is the volume of its parent directory: the
+// shell recycles a symlink or junction itself, never its target. The drive
+// letter alone is not enough, because the parent can be a volume mount folder
+// on C:, or sit behind a junction or symlink that leads to another volume or a
+// share. The parent's lexical and final (all reparse points followed) paths
+// must both be on a fixed volume; anything that cannot be resolved reports
+// DRIVE_UNKNOWN.
 func recycleBinDriveType(absPath string) uint32 {
-	resolved, err := filepath.EvalSymlinks(absPath)
+	parent := filepath.Dir(filepath.Clean(absPath))
+	final, err := finalPathName(parent)
 	if err != nil {
 		return windows.DRIVE_UNKNOWN
 	}
-	for _, p := range []string{absPath, resolved} {
-		if strings.HasPrefix(p, `\\`) || strings.HasPrefix(p, "//") {
-			return windows.DRIVE_REMOTE
-		}
-		if t := volumeDriveType(p); t != windows.DRIVE_FIXED {
+	for _, p := range []string{parent, final} {
+		if t := classifyVolumePath(p); t != windows.DRIVE_FIXED {
 			return t
 		}
 	}
 	return windows.DRIVE_FIXED
+}
+
+// classifyVolumePath maps a DOS, \\?\ or \\?\Volume{GUID} path to its drive
+// type. UNC forms are network paths; everything else is resolved by the
+// volume manager.
+func classifyVolumePath(p string) uint32 {
+	upper := strings.ToUpper(p)
+	if strings.HasPrefix(upper, `\\?\UNC\`) {
+		return windows.DRIVE_REMOTE
+	}
+	if (strings.HasPrefix(p, `\\`) || strings.HasPrefix(p, "//")) &&
+		!strings.HasPrefix(p, `\\?\`) && !strings.HasPrefix(p, `\\.\`) {
+		return windows.DRIVE_REMOTE
+	}
+	return volumeDriveType(p)
 }
 
 // volumeDriveType asks for the mount point that actually holds path
@@ -92,6 +115,32 @@ func volumeDriveType(path string) uint32 {
 		return windows.DRIVE_UNKNOWN
 	}
 	return windows.GetDriveType(&buf[0])
+}
+
+// finalPathName follows every symlink, junction, and mount point in dir.
+// A directory on a volume without a drive letter has no DOS name, so the GUID
+// form is the fallback.
+func finalPathName(dir string) (string, error) {
+	p, err := windows.UTF16PtrFromString(dir)
+	if err != nil {
+		return "", err
+	}
+	h, err := windows.CreateFile(p, 0,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
+		nil, windows.OPEN_EXISTING, windows.FILE_FLAG_BACKUP_SEMANTICS, 0)
+	if err != nil {
+		return "", err
+	}
+	defer windows.CloseHandle(h) //nolint:errcheck // read-only query handle
+
+	buf := make([]uint16, windows.MAX_LONG_PATH)
+	for _, flags := range []uint32{fileNameNormalized | volumeNameDOS, fileNameNormalized | volumeNameGUID} {
+		n, err := windows.GetFinalPathNameByHandle(h, &buf[0], uint32(len(buf)), flags)
+		if err == nil && n > 0 && int(n) < len(buf) {
+			return windows.UTF16ToString(buf[:n]), nil
+		}
+	}
+	return "", errors.New("cannot resolve final path")
 }
 
 var errRecycleBinUnavailable = errors.New("recycle bin is not available on this drive; delete it manually if intended")

@@ -479,7 +479,7 @@ scanChildren:
 			continue
 		}
 		// Actual disk usage for sparse/cloud files, deduping hardlinks.
-		size, deduped := countableFileSize(info, &limiter.seen)
+		size, deduped := countableFileSize(fullPath, info, &limiter.seen)
 		if deduped {
 			dedupedHardlink.Store(true)
 		}

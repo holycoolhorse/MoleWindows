@@ -189,8 +189,8 @@ func openPathCommand(ctx context.Context, path string, reveal bool) *exec.Cmd {
 // countableFileSize returns the size to attribute to a file. NTFS hardlinks
 // are not deduplicated: the link count is not available from a directory
 // listing without opening every file.
-func countableFileSize(info fs.FileInfo, _ *sync.Map) (int64, bool) {
-	return getActualFileSize("", info), false
+func countableFileSize(path string, info fs.FileInfo, _ *sync.Map) (int64, bool) {
+	return getActualFileSize(path, info), false
 }
 
 // File attributes that change how many bytes a file occupies on disk.

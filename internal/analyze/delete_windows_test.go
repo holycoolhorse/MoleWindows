@@ -268,7 +268,37 @@ func TestRecycleBinDriveTypeResolvesRealVolume(t *testing.T) {
 	if got, want := recycleBinDriveType(file), volumeDriveType(filepath.VolumeName(file)+`\`); got != want {
 		t.Fatalf("recycleBinDriveType(%q) = %d, want the volume's own type %d", file, got, want)
 	}
-	if got := recycleBinDriveType(filepath.Join(dir, "missing")); got != windows.DRIVE_UNKNOWN {
-		t.Fatalf("unresolvable path drive type = %d, want DRIVE_UNKNOWN", got)
+	if got := recycleBinDriveType(filepath.Join(dir, "missing-parent", "x")); got != windows.DRIVE_UNKNOWN {
+		t.Fatalf("unresolvable parent drive type = %d, want DRIVE_UNKNOWN", got)
+	}
+}
+
+// The shell recycles a link itself, so only the parent's volume matters: a
+// dangling link, or one that points at another volume, is still recyclable.
+func TestRecycleBinDriveTypeIgnoresSymlinkTarget(t *testing.T) {
+	dir := t.TempDir()
+	link := filepath.Join(dir, "dangling")
+	if err := os.Symlink(filepath.Join(dir, "nope"), link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	want := recycleBinDriveType(filepath.Join(dir, "sibling"))
+	if got := recycleBinDriveType(link); got != want || got == windows.DRIVE_UNKNOWN {
+		t.Fatalf("dangling link drive type = %d, want the parent's type %d", got, want)
+	}
+}
+
+func TestClassifyVolumePathUNC(t *testing.T) {
+	for _, p := range []string{`\\server\share\x`, `\\?\UNC\server\share\x`, `\\?\unc\server\share`, `//server/share`} {
+		if got := classifyVolumePath(p); got != windows.DRIVE_REMOTE {
+			t.Errorf("classifyVolumePath(%q) = %d, want DRIVE_REMOTE", p, got)
+		}
+	}
+	// Device-namespace forms go to the volume manager, not the UNC rule.
+	sys := os.Getenv("SystemDrive")
+	if sys == "" {
+		sys = "C:"
+	}
+	if got := classifyVolumePath(`\\?\` + sys + `\`); got == windows.DRIVE_REMOTE {
+		t.Errorf("classifyVolumePath(%q) = DRIVE_REMOTE, want the local volume type", `\\?\`+sys+`\`)
 	}
 }

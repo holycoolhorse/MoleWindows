@@ -3,6 +3,7 @@
 package analyze
 
 import (
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -378,5 +379,37 @@ func TestFilterIgnoresAncestorPathSegments(t *testing.T) {
 	m.applyLargeFilter()
 	if len(m.largeFiles) != 1 || m.largeFiles[0].Name != "a.bin" {
 		t.Fatalf("large-file filter = %+v, want only the file under logs/apple", m.largeFiles)
+	}
+}
+
+// Top files can arrive in canonical form (Spotlight resolves symlinks) while the
+// viewed path was typed through a symlink. Those rows must still be matched
+// below the viewed directory, never on its ancestors.
+func TestFilterMatchesCanonicalPathsBelowSymlinkedRoot(t *testing.T) {
+	requireSymlinks(t)
+	base := t.TempDir()
+	realRoot := filepath.Join(base, "AppStore", "real")
+	if err := os.MkdirAll(filepath.Join(realRoot, "apple"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(base, "link")
+	if err := os.Symlink(realRoot, link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	resolved, err := filepath.EvalSymlinks(realRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := model{
+		path: link,
+		largeFilesAll: []fileEntry{
+			{Name: "a.bin", Path: filepath.Join(resolved, "apple", "a.bin"), Size: 2},
+			{Name: "b.bin", Path: filepath.Join(resolved, "b.bin"), Size: 1},
+		},
+		largeFilter: "app",
+	}
+	m.applyLargeFilter()
+	if len(m.largeFiles) != 1 || m.largeFiles[0].Name != "a.bin" {
+		t.Fatalf("large-file filter = %+v, want only the file under apple/", m.largeFiles)
 	}
 }

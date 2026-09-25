@@ -322,26 +322,44 @@ func dirEntryPath(e dirEntry) string   { return e.Path }
 // case-insensitive substring query. Single source of truth for both the
 // Top-files and directory filters so their match semantics cannot drift.
 //
-// The path is matched relative to root, the directory being viewed. Ancestor
+// The path is matched only below the directory being viewed. Ancestor
 // segments are shared by every row, so matching them made a query such as
 // "app" select everything under ~/Library/Application Support or
-// %USERPROFILE%\AppData.
-func filterMatches(name, path, root, query string) bool {
+// %USERPROFILE%\AppData. roots lists the viewed directory in each spelling a
+// path may use (as typed, and symlink-resolved, since Spotlight returns
+// canonical paths); a path under none of them is matched by name only.
+func filterMatches(name, path string, roots []string, query string) bool {
 	needle := strings.ToLower(query)
-	return strings.Contains(strings.ToLower(name), needle) ||
-		strings.Contains(strings.ToLower(filterPath(path, root)), needle)
-}
-
-// filterPath is path relative to root when path lies inside it, otherwise the
-// home-abbreviated display form.
-func filterPath(path, root string) string {
-	if root != "" {
-		if rel, err := filepath.Rel(root, path); err == nil && rel != ".." &&
-			!strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-			return rel
+	if strings.Contains(strings.ToLower(name), needle) {
+		return true
+	}
+	for _, root := range roots {
+		if rel, ok := relativeBelow(root, path); ok {
+			return strings.Contains(strings.ToLower(rel), needle)
 		}
 	}
-	return displayPath(path)
+	return false
+}
+
+// relativeBelow returns path relative to root when path lies inside root.
+func relativeBelow(root, path string) (string, bool) {
+	if root == "" {
+		return "", false
+	}
+	rel, err := filepath.Rel(root, path)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+	return rel, true
+}
+
+// filterRoots returns root and, when different, its symlink-resolved form.
+func filterRoots(root string) []string {
+	roots := []string{root}
+	if resolved, err := filepath.EvalSymlinks(root); err == nil && resolved != root {
+		roots = append(roots, resolved)
+	}
+	return roots
 }
 
 // filterByQuery returns the items matching query, or the original slice
@@ -350,9 +368,10 @@ func filterByQuery[T any](all []T, query, root string, nameOf, pathOf func(T) st
 	if query == "" {
 		return all
 	}
+	roots := filterRoots(root)
 	out := make([]T, 0, len(all))
 	for _, item := range all {
-		if filterMatches(nameOf(item), pathOf(item), root, query) {
+		if filterMatches(nameOf(item), pathOf(item), roots, query) {
 			out = append(out, item)
 		}
 	}
