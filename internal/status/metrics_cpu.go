@@ -65,6 +65,16 @@ func collectCPUWithOptions(includeSlowFallbacks bool) (CPUStatus, error) {
 			// estimate zeroed per-core usage. The next full refresh corrects it.
 			percents = make([]float64, logical)
 			perCoreEstimated = true
+			if runtime.GOOS == "windows" {
+				// GetSystemTimes is as cheap as the failed per-core query, so
+				// use the machine-wide figure instead of reporting 0%.
+				if totals, totalErr := cpuPercentFunc(0, false); totalErr == nil && len(totals) > 0 {
+					totalPercent = totals[0]
+					for i := range percents {
+						percents[i] = totalPercent
+					}
+				}
+			}
 		} else {
 			fallbackUsage, fallbackPerCore, fallbackErr := fallbackCPUUtilization(logical)
 			if fallbackErr != nil {

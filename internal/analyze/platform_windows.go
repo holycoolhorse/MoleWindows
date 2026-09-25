@@ -13,6 +13,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
@@ -192,8 +193,50 @@ func countableFileSize(info fs.FileInfo, _ *sync.Map) (int64, bool) {
 	return getActualFileSize("", info), false
 }
 
-func getActualFileSize(_ string, info fs.FileInfo) int64 {
-	return info.Size()
+// File attributes that change how many bytes a file occupies on disk.
+const (
+	fileAttributeSparse             = 0x00000200
+	fileAttributeCompressed         = 0x00000800
+	fileAttributeOffline            = 0x00001000
+	fileAttributeRecallOnOpen       = 0x00040000
+	fileAttributeRecallOnDataAccess = 0x00400000
+)
+
+var procGetCompressedFileSizeW = windows.NewLazySystemDLL("kernel32.dll").NewProc("GetCompressedFileSizeW")
+
+// getActualFileSize returns the bytes a file occupies on this disk, which is
+// what deleting it would free. Cloud placeholders (OneDrive "online-only",
+// which Known Folder Move turns on for Desktop and Documents) hold no local
+// data, so they count as zero. Compressed and sparse files report their
+// allocated size when the path is known; otherwise the logical size.
+func getActualFileSize(path string, info fs.FileInfo) int64 {
+	data, ok := info.Sys().(*syscall.Win32FileAttributeData)
+	if !ok {
+		return info.Size()
+	}
+	return windowsOnDiskSize(path, data.FileAttributes, info.Size())
+}
+
+func windowsOnDiskSize(path string, attrs uint32, logical int64) int64 {
+	if attrs&(fileAttributeOffline|fileAttributeRecallOnOpen|fileAttributeRecallOnDataAccess) != 0 {
+		return 0
+	}
+	if attrs&(fileAttributeSparse|fileAttributeCompressed) == 0 || path == "" {
+		return logical
+	}
+	p, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return logical
+	}
+	var high uint32
+	low, _, callErr := procGetCompressedFileSizeW.Call(uintptr(unsafe.Pointer(p)), uintptr(unsafe.Pointer(&high)))
+	if uint32(low) == 0xFFFFFFFF && callErr != windows.ERROR_SUCCESS {
+		return logical
+	}
+	if onDisk := int64(high)<<32 | int64(uint32(low)); onDisk >= 0 && onDisk < logical {
+		return onDisk
+	}
+	return logical
 }
 
 func getLastAccessTimeFromInfo(info fs.FileInfo) time.Time {

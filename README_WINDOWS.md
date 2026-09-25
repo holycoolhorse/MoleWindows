@@ -37,11 +37,13 @@ mole status --json              # one JSON snapshot
 mole status --watch --interval 2s
 ```
 
+The JSON schemas match macOS. An overview scan reports `"overview": true` with `"path": "/"` as a platform-neutral marker; each entry carries its real Windows path.
+
 In `analyze`, arrow keys navigate, `Enter` opens a folder, `Space` selects, `Delete`/`Backspace` moves the selection to the Recycle Bin after you confirm with `Enter`, `O` opens with the default app, `F` shows it in File Explorer, `/` filters, `q` quits.
 
 ## Safety
 
-- Deletes go to the Recycle Bin only. There is no permanent-delete fallback. Paths on removable, network, or RAM drives are refused, because Windows would delete them permanently.
+- Deletes go to the Recycle Bin only; Mole never deletes permanently on its own. Paths on removable, network, or RAM volumes are refused, including volumes mounted into a folder and symlinks that lead to a share, because Windows would delete them permanently. If an item is too large for the Recycle Bin, Windows itself asks before deleting it permanently; answer No to keep it.
 - System locations are protected and refused before anything is touched: drive roots and their system entries (`pagefile.sys`, `$Recycle.Bin`, `System Volume Information`, ...), `C:\Windows`, `Program Files`, `ProgramData` system folders and MSI caches, `C:\Users` and every profile root, and your own `AppData`, `Temp`, and `OneDrive` roots. Checks are case-insensitive and follow junctions and 8.3 short names.
 - UNC paths (`\\server\share`), device paths (`\\?\`), and alternate data streams are refused.
 
@@ -86,10 +88,12 @@ mole status --json              # tek JSON anlık görüntü
 mole status --watch --interval 2s
 ```
 
+JSON şemaları macOS ile aynıdır. Genel bakış taraması platformdan bağımsız bir işaret olarak `"overview": true` ve `"path": "/"` döndürür; her girdide gerçek Windows yolu bulunur.
+
 `analyze` içinde ok tuşları gezinir, `Enter` klasöre girer, `Space` seçer, `Delete`/`Backspace` seçimi `Enter` ile onayladıktan sonra Geri Dönüşüm Kutusu'na taşır, `O` varsayılan uygulamayla açar, `F` Dosya Gezgini'nde gösterir, `/` filtreler, `q` çıkar.
 
 ## Güvenlik
 
-- Silme işlemleri yalnızca Geri Dönüşüm Kutusu'na gider; kalıcı silmeye geri düşülmez. Çıkarılabilir, ağ veya RAM sürücülerindeki yollar reddedilir, çünkü Windows bunları kalıcı olarak siler.
+- Silme işlemleri yalnızca Geri Dönüşüm Kutusu'na gider; Mole kendi başına asla kalıcı silme yapmaz. Çıkarılabilir, ağ veya RAM birimlerindeki yollar reddedilir; bir klasöre bağlanmış birimler ve ağ paylaşımına giden sembolik bağlantılar da buna dahildir, çünkü Windows bunları kalıcı olarak siler. Bir öğe Geri Dönüşüm Kutusu için fazla büyükse, kalıcı silmeden önce Windows'un kendisi sorar; öğeyi korumak için Hayır deyin.
 - Sistem konumları korunur ve hiçbir şeye dokunulmadan reddedilir: sürücü kökleri ve sistem girdileri (`pagefile.sys`, `$Recycle.Bin`, `System Volume Information`, ...), `C:\Windows`, `Program Files`, `ProgramData` sistem klasörleri ve MSI önbellekleri, `C:\Users` ve tüm profil kökleri, ayrıca kendi `AppData`, `Temp` ve `OneDrive` kökleriniz. Kontroller büyük/küçük harfe duyarsızdır; junction ve 8.3 kısa adları da izlenir.
 - UNC yolları (`\\sunucu\paylasim`), aygıt yolları (`\\?\`) ve alternatif veri akışları reddedilir.

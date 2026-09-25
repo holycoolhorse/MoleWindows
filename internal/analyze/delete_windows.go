@@ -40,9 +40,16 @@ type shFileOpStruct struct {
 	lpszProgressTitle     *uint16
 }
 
+// The layout above is only valid on 64-bit Windows. This fails to compile
+// anywhere SHFILEOPSTRUCTW is not the 56-byte natural-alignment form, such as
+// GOARCH=386 where shellapi.h packs it to 1 byte.
+var _ = [1]struct{}{}[unsafe.Sizeof(shFileOpStruct{})-56]
+
 var (
 	modShell32           = windows.NewLazySystemDLL("shell32.dll")
 	procSHFileOperationW = modShell32.NewProc("SHFileOperationW")
+	modKernel32          = windows.NewLazySystemDLL("kernel32.dll")
+	procGetConsoleWindow = modKernel32.NewProc("GetConsoleWindow")
 )
 
 // recycleBinMover is the final sink. Tests replace it to observe exactly which
@@ -50,19 +57,48 @@ var (
 var recycleBinMover = moveToRecycleBin
 
 // driveTypeForPath is replaceable in tests.
-var driveTypeForPath = func(absPath string) uint32 {
-	root := filepath.VolumeName(absPath) + `\`
-	p, err := windows.UTF16PtrFromString(root)
+var driveTypeForPath = recycleBinDriveType
+
+// recycleBinDriveType reports the drive type the shell will see for absPath.
+// The drive letter alone is not enough: a removable volume can be mounted into
+// a folder on C:, and a directory symlink on C: can point at a network share.
+// Both the lexical path and its fully resolved form must sit on a fixed
+// volume; anything that cannot be resolved reports DRIVE_UNKNOWN.
+func recycleBinDriveType(absPath string) uint32 {
+	resolved, err := filepath.EvalSymlinks(absPath)
 	if err != nil {
 		return windows.DRIVE_UNKNOWN
 	}
-	return windows.GetDriveType(p)
+	for _, p := range []string{absPath, resolved} {
+		if strings.HasPrefix(p, `\\`) || strings.HasPrefix(p, "//") {
+			return windows.DRIVE_REMOTE
+		}
+		if t := volumeDriveType(p); t != windows.DRIVE_FIXED {
+			return t
+		}
+	}
+	return windows.DRIVE_FIXED
+}
+
+// volumeDriveType asks for the mount point that actually holds path
+// (GetVolumePathNameW follows volume mount folders) and returns its type.
+func volumeDriveType(path string) uint32 {
+	p, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return windows.DRIVE_UNKNOWN
+	}
+	buf := make([]uint16, windows.MAX_LONG_PATH)
+	if err := windows.GetVolumePathName(p, &buf[0], uint32(len(buf))); err != nil {
+		return windows.DRIVE_UNKNOWN
+	}
+	return windows.GetDriveType(&buf[0])
 }
 
 var errRecycleBinUnavailable = errors.New("recycle bin is not available on this drive; delete it manually if intended")
 
-// moveToTrash moves a file or directory to the Recycle Bin. There is no
-// permanent-delete fallback: a path the Recycle Bin cannot accept is refused.
+// moveToTrash moves a file or directory to the Recycle Bin. Mole never
+// deletes permanently on its own: drives without a Recycle Bin are refused, and
+// an item the bin cannot hold is left to the shell's own confirmation prompt.
 func moveToTrash(path string) error {
 	// Validate raw input before Abs resolves ".." components away.
 	if err := validateTrashTarget(path); err != nil {
@@ -97,7 +133,9 @@ func moveToTrash(path string) error {
 // moveToRecycleBin calls SHFileOperationW with FOF_ALLOWUNDO. The call runs on
 // a locked, COM-initialized thread because the shell implements it on top of
 // IFileOperation. FOF_WANTNUKEWARNING makes the shell ask before destroying
-// anything it cannot recycle (for example an item larger than the bin).
+// anything it cannot recycle (for example an item larger than the bin); the
+// console window owns that dialog so it opens in front of the terminal, and
+// answering No leaves the item in place.
 func moveToRecycleBin(absPath string) error {
 	from, err := windows.UTF16FromString(absPath)
 	if err != nil {
@@ -112,7 +150,9 @@ func moveToRecycleBin(absPath string) error {
 		defer windows.CoUninitialize()
 	}
 
+	consoleWindow, _, _ := procGetConsoleWindow.Call()
 	op := shFileOpStruct{
+		hwnd:   consoleWindow,
 		wFunc:  foDelete,
 		pFrom:  &from[0],
 		fFlags: recycleBinOperation,

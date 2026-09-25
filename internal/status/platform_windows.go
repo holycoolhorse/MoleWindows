@@ -338,10 +338,8 @@ func collectPlatformProcesses() (processSample, error) {
 			cpuTimes[key] = info.UserTime + info.KernelTime
 			name := ""
 			if info.ImageName.Buffer != nil && info.ImageName.Length > 0 {
-				name = windows.UTF16PtrToString(info.ImageName.Buffer)
-				if n := int(info.ImageName.Length / 2); n < len(name) {
-					name = name[:n]
-				}
+				// Length is in bytes of UTF-16; decode exactly that many units.
+				name = windows.UTF16ToString(unsafe.Slice(info.ImageName.Buffer, info.ImageName.Length/2))
 			}
 			if name == "" && pid == 4 {
 				name = "System"

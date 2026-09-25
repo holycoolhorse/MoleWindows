@@ -105,3 +105,31 @@ func TestDuSizingDisabledOnWindows(t *testing.T) {
 		t.Fatalf("getDirSizeFast = %d, %v; want 4096 via the Go walk", size, err)
 	}
 }
+
+func TestWindowsOnDiskSizeCountsPlaceholdersAsZero(t *testing.T) {
+	for _, attrs := range []uint32{fileAttributeOffline, fileAttributeRecallOnOpen, fileAttributeRecallOnDataAccess | 0x20} {
+		if got := windowsOnDiskSize(`C:\Users\a\OneDrive\big.mp4`, attrs, 5<<30); got != 0 {
+			t.Errorf("attrs %#x: on-disk size = %d, want 0 for a cloud placeholder", attrs, got)
+		}
+	}
+	if got := windowsOnDiskSize("", fileAttributeCompressed, 4096); got != 4096 {
+		t.Errorf("compressed file without a path = %d, want the logical size", got)
+	}
+	if got := windowsOnDiskSize(`C:\x`, 0x20, 1234); got != 1234 {
+		t.Errorf("ordinary file = %d, want the logical size", got)
+	}
+}
+
+func TestGetActualFileSizeOrdinaryFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "f.bin")
+	if err := os.WriteFile(path, make([]byte, 10000), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := getActualFileSize(path, info); got != 10000 {
+		t.Fatalf("getActualFileSize = %d, want 10000", got)
+	}
+}

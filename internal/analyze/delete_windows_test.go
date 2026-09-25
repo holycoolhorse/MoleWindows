@@ -258,3 +258,17 @@ func TestPathWithinFold(t *testing.T) {
 		}
 	}
 }
+
+func TestRecycleBinDriveTypeResolvesRealVolume(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "probe.txt")
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := recycleBinDriveType(file), volumeDriveType(filepath.VolumeName(file)+`\`); got != want {
+		t.Fatalf("recycleBinDriveType(%q) = %d, want the volume's own type %d", file, got, want)
+	}
+	if got := recycleBinDriveType(filepath.Join(dir, "missing")); got != windows.DRIVE_UNKNOWN {
+		t.Fatalf("unresolvable path drive type = %d, want DRIVE_UNKNOWN", got)
+	}
+}
