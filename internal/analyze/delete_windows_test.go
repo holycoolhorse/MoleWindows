@@ -302,3 +302,13 @@ func TestClassifyVolumePathUNC(t *testing.T) {
 		t.Errorf("classifyVolumePath(%q) = DRIVE_REMOTE, want the local volume type", `\\?\`+sys+`\`)
 	}
 }
+
+func TestIsVolumeMountFolderOrdinaryDirs(t *testing.T) {
+	dir := t.TempDir()
+	if isVolumeMountFolder(dir) {
+		t.Fatalf("ordinary temp dir %q reported as a mount folder", dir)
+	}
+	if isVolumeMountFolder(filepath.VolumeName(dir) + `\`) {
+		t.Fatal("drive roots are protected elsewhere and must not count as mount folders")
+	}
+}

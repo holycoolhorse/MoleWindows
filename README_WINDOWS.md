@@ -43,7 +43,7 @@ In `analyze`, arrow keys navigate, `Enter` opens a folder, `Space` selects, `Del
 
 ## Safety
 
-- Deletes go to the Recycle Bin only; Mole never deletes permanently on its own. Paths on removable, network, or RAM volumes are refused, including volumes mounted into a folder and junctions or symlinks that lead to another volume or a share, because Windows would delete them permanently. If an item is too large for the Recycle Bin, Windows itself asks before deleting it permanently; answer No to keep it.
+- Deletes go to the Recycle Bin only; Mole never deletes permanently on its own. Paths on removable, network, or RAM volumes are refused, including items inside a folder where such a volume is mounted, or reached through a junction or symlink that leads to one (a link itself is recycled, not its target), because Windows would delete them permanently. If an item is too large for the Recycle Bin, Windows itself asks before deleting it permanently; answer No to keep it.
 - System locations are protected and refused before anything is touched: drive roots and their system entries (`pagefile.sys`, `$Recycle.Bin`, `System Volume Information`, ...), `C:\Windows`, `Program Files`, `ProgramData` system folders and MSI caches, `C:\Users` and every profile root, and your own `AppData`, `Temp`, and `OneDrive` roots. Checks are case-insensitive and follow junctions and 8.3 short names.
 - UNC paths (`\\server\share`), device paths (`\\?\`), and alternate data streams are refused.
 
@@ -94,6 +94,6 @@ JSON şemaları macOS ile aynıdır. Genel bakış taraması platformdan bağım
 
 ## Güvenlik
 
-- Silme işlemleri yalnızca Geri Dönüşüm Kutusu'na gider; Mole kendi başına asla kalıcı silme yapmaz. Çıkarılabilir, ağ veya RAM birimlerindeki yollar reddedilir; bir klasöre bağlanmış birimler ile başka bir birime veya ağ paylaşımına giden junction ve sembolik bağlantılar da buna dahildir, çünkü Windows bunları kalıcı olarak siler. Bir öğe Geri Dönüşüm Kutusu için fazla büyükse, kalıcı silmeden önce Windows'un kendisi sorar; öğeyi korumak için Hayır deyin.
+- Silme işlemleri yalnızca Geri Dönüşüm Kutusu'na gider; Mole kendi başına asla kalıcı silme yapmaz. Çıkarılabilir, ağ veya RAM birimlerindeki yollar reddedilir; böyle bir birimin bağlandığı klasördeki veya ona giden bir junction ya da sembolik bağlantı üzerinden erişilen öğeler de buna dahildir (bağlantının kendisi geri dönüşüme gider, hedefi değil), çünkü Windows bunları kalıcı olarak siler. Bir öğe Geri Dönüşüm Kutusu için fazla büyükse, kalıcı silmeden önce Windows'un kendisi sorar; öğeyi korumak için Hayır deyin.
 - Sistem konumları korunur ve hiçbir şeye dokunulmadan reddedilir: sürücü kökleri ve sistem girdileri (`pagefile.sys`, `$Recycle.Bin`, `System Volume Information`, ...), `C:\Windows`, `Program Files`, `ProgramData` sistem klasörleri ve MSI önbellekleri, `C:\Users` ve tüm profil kökleri, ayrıca kendi `AppData`, `Temp` ve `OneDrive` kökleriniz. Kontroller büyük/küçük harfe duyarsızdır; junction ve 8.3 kısa adları da izlenir.
 - UNC yolları (`\\sunucu\paylasim`), aygıt yolları (`\\?\`) ve alternatif veri akışları reddedilir.

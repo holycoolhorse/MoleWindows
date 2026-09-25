@@ -75,6 +75,10 @@ const (
 // must both be on a fixed volume; anything that cannot be resolved reports
 // DRIVE_UNKNOWN.
 func recycleBinDriveType(absPath string) uint32 {
+	if isVolumeMountFolder(absPath) {
+		// Deleting a mount folder would act on a whole volume.
+		return windows.DRIVE_UNKNOWN
+	}
 	parent := filepath.Dir(filepath.Clean(absPath))
 	final, err := finalPathName(parent)
 	if err != nil {
@@ -101,6 +105,25 @@ func classifyVolumePath(p string) uint32 {
 		return windows.DRIVE_REMOTE
 	}
 	return volumeDriveType(p)
+}
+
+// isVolumeMountFolder reports whether path is itself a folder where a volume
+// is mounted: GetVolumePathNameW returns the path as its own mount point.
+// Drive roots are excluded; they are protected separately.
+func isVolumeMountFolder(path string) bool {
+	clean := filepath.Clean(path)
+	if isFilesystemRoot(clean) {
+		return false
+	}
+	p, err := windows.UTF16PtrFromString(clean)
+	if err != nil {
+		return true
+	}
+	buf := make([]uint16, windows.MAX_LONG_PATH)
+	if err := windows.GetVolumePathName(p, &buf[0], uint32(len(buf))); err != nil {
+		return false
+	}
+	return strings.EqualFold(filepath.Clean(windows.UTF16ToString(buf)), clean)
 }
 
 // volumeDriveType asks for the mount point that actually holds path
