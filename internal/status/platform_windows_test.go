@@ -56,3 +56,14 @@ func TestSystemDiskMountUsesSystemDrive(t *testing.T) {
 		t.Fatalf("systemDiskMount() = %q, want D:", got)
 	}
 }
+
+func TestPlatformDiskKindSystemDriveIsInternal(t *testing.T) {
+	drive := os.Getenv("SystemDrive")
+	if drive == "" {
+		drive = "C:"
+	}
+	skip, external := platformDiskKind(drive)
+	if skip || external {
+		t.Fatalf("platformDiskKind(%q) = skip %v, external %v; want an internal disk", drive, skip, external)
+	}
+}

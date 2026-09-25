@@ -47,6 +47,7 @@ var skipDiskFSTypes = map[string]bool{
 var (
 	diskPartitionsFunc = disk.Partitions
 	diskUsageFunc      = disk.Usage
+	diskKindFunc       = platformDiskKind
 )
 
 const (
@@ -82,7 +83,7 @@ func collectDisksWithCorrections(useCorrections bool) ([]DiskStatus, error) {
 		windowsExternal := false
 		if runtime.GOOS == "windows" {
 			var skip bool
-			if skip, windowsExternal = platformDiskKind(part.Mountpoint); skip {
+			if skip, windowsExternal = diskKindFunc(part.Mountpoint); skip {
 				continue
 			}
 		}

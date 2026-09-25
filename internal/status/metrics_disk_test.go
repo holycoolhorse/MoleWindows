@@ -260,6 +260,7 @@ func TestCollectDisksFastSkipsSlowCorrections(t *testing.T) {
 
 	const rawTotal = uint64(2 * 1024 * 1024 * 1024)
 	const rawUsed = uint64(1024 * 1024 * 1024)
+	stubDiskKind(t)
 	diskPartitionsFunc = func(all bool) ([]disk.PartitionStat, error) {
 		if all {
 			t.Fatalf("collectDisksFast() should request physical partitions only")
@@ -453,4 +454,13 @@ func TestFinderPurgeableBytesIgnoresCorrectedTotal(t *testing.T) {
 	if got := finderPurgeableBytes(finderFree, rawFree); got != 0 {
 		t.Fatalf("purgeable when finder below statfs = %d, want 0", got)
 	}
+}
+
+// stubDiskKind keeps mocked partitions (Unix mount points such as "/") away
+// from the real Windows drive-type query, which cannot classify them.
+func stubDiskKind(t *testing.T) {
+	t.Helper()
+	orig := diskKindFunc
+	diskKindFunc = func(string) (bool, bool) { return false, false }
+	t.Cleanup(func() { diskKindFunc = orig })
 }

@@ -36,6 +36,7 @@ func TestCollectFastAvoidsExternalCommands(t *testing.T) {
 		externalCalls.Add(1)
 		return false
 	}
+	stubDiskKind(t)
 	diskPartitionsFunc = func(all bool) ([]disk.PartitionStat, error) {
 		return []disk.PartitionStat{
 			{Device: "/dev/disk3s1s1", Mountpoint: "/", Fstype: "apfs"},
@@ -77,6 +78,7 @@ func TestCollectProcessesKeepsLiveProcessesWithCachedEnrichment(t *testing.T) {
 		collectProcessesFunc = origCollectProcesses
 	})
 
+	stubDiskKind(t)
 	diskPartitionsFunc = func(all bool) ([]disk.PartitionStat, error) {
 		return []disk.PartitionStat{
 			{Device: "/dev/disk3s1s1", Mountpoint: "/", Fstype: "apfs"},

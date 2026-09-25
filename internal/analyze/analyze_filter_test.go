@@ -3,6 +3,7 @@
 package analyze
 
 import (
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -346,5 +347,36 @@ func TestLargeFilterViewShowsHintAndQuery(t *testing.T) {
 	}
 	if !strings.Contains(view, "matches") {
 		t.Fatalf("expected match count in filter line, got:\n%s", view)
+	}
+}
+
+// Ancestor segments are shared by every row, so they must not decide a match:
+// under ~/Library/Application Support or %USERPROFILE%\AppData the query "app"
+// used to select every entry.
+func TestFilterIgnoresAncestorPathSegments(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "AppData", "Local")
+	m := model{
+		path: root,
+		entriesAll: []dirEntry{
+			{Name: "apps", Path: filepath.Join(root, "apps"), Size: 2, IsDir: true},
+			{Name: "logs", Path: filepath.Join(root, "logs"), Size: 1, IsDir: true},
+		},
+		largeFilesAll: []fileEntry{
+			{Name: "a.bin", Path: filepath.Join(root, "logs", "apple", "a.bin"), Size: 2},
+			{Name: "b.bin", Path: filepath.Join(root, "logs", "b.bin"), Size: 1},
+		},
+	}
+
+	m.entryFilter = "app"
+	m.applyEntryFilter()
+	if len(m.entries) != 1 || m.entries[0].Name != "apps" {
+		t.Fatalf("entry filter matched ancestors: %+v", m.entries)
+	}
+
+	// Segments below the viewed directory still count for Top files.
+	m.largeFilter = "app"
+	m.applyLargeFilter()
+	if len(m.largeFiles) != 1 || m.largeFiles[0].Name != "a.bin" {
+		t.Fatalf("large-file filter = %+v, want only the file under logs/apple", m.largeFiles)
 	}
 }

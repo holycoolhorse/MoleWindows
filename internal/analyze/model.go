@@ -4,6 +4,7 @@ package analyze
 
 import (
 	"context"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -320,21 +321,38 @@ func dirEntryPath(e dirEntry) string   { return e.Path }
 // filterMatches reports whether an item with the given name and path matches a
 // case-insensitive substring query. Single source of truth for both the
 // Top-files and directory filters so their match semantics cannot drift.
-func filterMatches(name, path, query string) bool {
+//
+// The path is matched relative to root, the directory being viewed. Ancestor
+// segments are shared by every row, so matching them made a query such as
+// "app" select everything under ~/Library/Application Support or
+// %USERPROFILE%\AppData.
+func filterMatches(name, path, root, query string) bool {
 	needle := strings.ToLower(query)
 	return strings.Contains(strings.ToLower(name), needle) ||
-		strings.Contains(strings.ToLower(displayPath(path)), needle)
+		strings.Contains(strings.ToLower(filterPath(path, root)), needle)
+}
+
+// filterPath is path relative to root when path lies inside it, otherwise the
+// home-abbreviated display form.
+func filterPath(path, root string) string {
+	if root != "" {
+		if rel, err := filepath.Rel(root, path); err == nil && rel != ".." &&
+			!strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return rel
+		}
+	}
+	return displayPath(path)
 }
 
 // filterByQuery returns the items matching query, or the original slice
 // unchanged when the query is empty. nameOf/pathOf project the fields matched.
-func filterByQuery[T any](all []T, query string, nameOf, pathOf func(T) string) []T {
+func filterByQuery[T any](all []T, query, root string, nameOf, pathOf func(T) string) []T {
 	if query == "" {
 		return all
 	}
 	out := make([]T, 0, len(all))
 	for _, item := range all {
-		if filterMatches(nameOf(item), pathOf(item), query) {
+		if filterMatches(nameOf(item), pathOf(item), root, query) {
 			out = append(out, item)
 		}
 	}
@@ -354,7 +372,7 @@ func removeByPath[T any](items []T, path string, pathOf func(T) string) []T {
 // applyLargeFilter rebuilds the rendered Top-files view from largeFilesAll
 // using the current query. An empty query restores the full list.
 func (m *model) applyLargeFilter() {
-	m.largeFiles = filterByQuery(m.largeFilesAll, m.largeFilter, fileEntryName, fileEntryPath)
+	m.largeFiles = filterByQuery(m.largeFilesAll, m.largeFilter, m.path, fileEntryName, fileEntryPath)
 	m.clampLargeSelection()
 }
 
@@ -373,7 +391,7 @@ func (m *model) resetLargeFilter() {
 // the current query. The directory view is the drill-down list (m.entries) in
 // non-overview mode.
 func (m *model) applyEntryFilter() {
-	m.entries = filterByQuery(m.entriesAll, m.entryFilter, dirEntryName, dirEntryPath)
+	m.entries = filterByQuery(m.entriesAll, m.entryFilter, m.path, dirEntryName, dirEntryPath)
 	m.clampEntrySelection()
 }
 
