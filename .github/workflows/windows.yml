@@ -1,8 +1,9 @@
 name: Windows
 
 on:
+  # Every branch: Windows behavior cannot be checked on the macOS runners the
+  # other workflows use, so feature branches get a Windows signal before a PR.
   push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
 
