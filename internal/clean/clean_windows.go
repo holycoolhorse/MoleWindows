@@ -106,7 +106,7 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 0
 	}
 	if !*yes {
-		_, _ = fmt.Fprintf(stdout, "\nDelete %s in %d files permanently? Type y and press Enter [y/N]: ", units.BytesSI(total), count)
+		_, _ = fmt.Fprintf(stdout, "\nDelete %s in %s permanently? Type y and press Enter [y/N]: ", units.BytesSI(total), fileCount(count))
 		line, _ := bufio.NewReader(stdin).ReadString('\n')
 		if answer := strings.ToLower(strings.TrimSpace(line)); answer != "y" && answer != "yes" {
 			_, _ = fmt.Fprintln(stdout, "Cancelled. Nothing was deleted.")
@@ -131,9 +131,9 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		failures = append(failures, r.failures...)
 	}
 
-	_, _ = fmt.Fprintf(stdout, "\nFreed %s (%d files removed).\n", units.BytesSI(freed), removed)
+	_, _ = fmt.Fprintf(stdout, "\nFreed %s (%s removed).\n", units.BytesSI(freed), fileCount(removed))
 	if failed > 0 {
-		_, _ = fmt.Fprintf(stdout, "%d files were in use or changed and were kept.\n", failed)
+		_, _ = fmt.Fprintf(stdout, "%s in use or changed since the scan; kept.\n", fileCount(failed))
 		if *debug {
 			for _, f := range failures {
 				_, _ = fmt.Fprintf(stdout, "  kept: %s\n", f)
@@ -299,6 +299,13 @@ func executePlan(p *targetPlan, log *opLog) execResult {
 	return r
 }
 
+func fileCount(n int) string {
+	if n == 1 {
+		return "1 file"
+	}
+	return fmt.Sprintf("%d files", n)
+}
+
 func planTotals(plans []targetPlan) (int64, int) {
 	var total int64
 	var count int
@@ -333,10 +340,10 @@ func printPreview(w io.Writer, plans []targetPlan, dryRun bool) {
 			_, _ = fmt.Fprintf(w, "  %-44s %s\n", p.name, "skipped: "+p.skipReason)
 			continue
 		}
-		_, _ = fmt.Fprintf(w, "  %-44s %8d files  %10s\n", p.name, len(p.files), units.BytesSI(p.bytes))
+		_, _ = fmt.Fprintf(w, "  %-44s %14s  %10s\n", p.name, fileCount(len(p.files)), units.BytesSI(p.bytes))
 	}
 	total, count := planTotals(plans)
-	_, _ = fmt.Fprintf(w, "\nTotal: %s in %d files\n", units.BytesSI(total), count)
+	_, _ = fmt.Fprintf(w, "\nTotal: %s in %s\n", units.BytesSI(total), fileCount(count))
 }
 
 // ---- process guard ----
