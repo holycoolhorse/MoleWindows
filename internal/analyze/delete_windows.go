@@ -257,6 +257,13 @@ func validateWindowsPathShape(path string) error {
 	return nil
 }
 
+// MoveToRecycleBin moves path to the Recycle Bin with every analyze safety
+// check (protected paths, drive type, path shape). Other Windows commands use
+// it so all recoverable deletes share one sink.
+func MoveToRecycleBin(path string) error {
+	return moveToTrash(path)
+}
+
 // IsProtectedPath exposes the Windows protected-path policy to the other
 // Windows commands (clean), so every delete surface refuses the same paths.
 func IsProtectedPath(path string) bool {

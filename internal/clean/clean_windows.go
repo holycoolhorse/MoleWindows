@@ -25,6 +25,7 @@ import (
 	"golang.org/x/sys/windows"
 
 	"github.com/tw93/mole/internal/analyze"
+	"github.com/tw93/mole/internal/oplog"
 	"github.com/tw93/mole/internal/units"
 )
 
@@ -116,8 +117,8 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 	}
 
-	log := openOpLog()
-	defer log.close()
+	log := oplog.Open("clean")
+	defer log.Close()
 	var freed int64
 	var removed, failed int
 	var failures []string
@@ -244,7 +245,7 @@ type execResult struct {
 // executePlan deletes one target's files. Each file is revalidated right
 // before removal: still a regular file (not a reparse point), unchanged since
 // the scan, lexically and physically inside the root, and not protected.
-func executePlan(p *targetPlan, log *opLog) execResult {
+func executePlan(p *targetPlan, log *oplog.Log) execResult {
 	var r execResult
 	dirFinal := map[string]string{}
 	inside := func(path string) bool {
@@ -273,17 +274,17 @@ func executePlan(p *targetPlan, log *opLog) execResult {
 			!inside(c.path),
 			analyze.IsProtectedPath(c.path):
 			r.failures = append(r.failures, c.path)
-			log.write("kept", c.path, c.size)
+			log.Write("kept", c.path, c.size)
 			continue
 		}
 		if err := os.Remove(c.path); err != nil {
 			r.failures = append(r.failures, c.path)
-			log.write("kept", c.path, c.size)
+			log.Write("kept", c.path, c.size)
 			continue
 		}
 		r.freed += c.size
 		r.removed++
-		log.write("deleted", c.path, c.size)
+		log.Write("deleted", c.path, c.size)
 	}
 
 	// Deepest first, so parents empty out; os.Remove refuses non-empty dirs.
@@ -425,43 +426,4 @@ func pathWithinFold(path, root string) bool {
 		prefix += `\`
 	}
 	return len(path) > len(prefix) && strings.EqualFold(path[:len(prefix)], prefix)
-}
-
-// ---- operation log ----
-
-type opLog struct {
-	w *bufio.Writer
-	f *os.File
-}
-
-// openOpLog appends to %LOCALAPPDATA%\mole\logs\operations.log unless
-// MO_NO_OPLOG=1. Logging problems never block cleanup.
-func openOpLog() *opLog {
-	if os.Getenv("MO_NO_OPLOG") == "1" {
-		return &opLog{}
-	}
-	dir := filepath.Join(os.Getenv("LOCALAPPDATA"), "mole", "logs")
-	if os.Getenv("LOCALAPPDATA") == "" || os.MkdirAll(dir, 0o755) != nil {
-		return &opLog{}
-	}
-	f, err := os.OpenFile(filepath.Join(dir, "operations.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-	if err != nil {
-		return &opLog{}
-	}
-	return &opLog{w: bufio.NewWriter(f), f: f}
-}
-
-func (l *opLog) write(action, path string, size int64) {
-	if l.w == nil {
-		return
-	}
-	_, _ = fmt.Fprintf(l.w, "%s\tclean\t%s\t%d\t%s\n", now().UTC().Format(time.RFC3339), action, size, path)
-}
-
-func (l *opLog) close() {
-	if l.w == nil {
-		return
-	}
-	_ = l.w.Flush()
-	_ = l.f.Close()
 }

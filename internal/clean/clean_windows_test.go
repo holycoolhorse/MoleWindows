@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/tw93/mole/internal/oplog"
 )
 
 type fakeProfile struct {
@@ -164,7 +166,7 @@ func TestCleanKeepsFilesChangedAfterScan(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := range plans {
-		executePlan(&plans[i], &opLog{})
+		executePlan(&plans[i], &oplog.Log{})
 	}
 	if !exists(changed) {
 		t.Fatal("a file rewritten after the scan must be kept")
