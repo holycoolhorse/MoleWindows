@@ -22,9 +22,10 @@ import (
 	"time"
 	"unsafe"
 
+	"golang.org/x/sys/windows"
+
 	"github.com/tw93/mole/internal/analyze"
 	"github.com/tw93/mole/internal/units"
-	"golang.org/x/sys/windows"
 )
 
 const usageText = `Usage: mole clean [OPTIONS]
