@@ -46,3 +46,8 @@ jobs:
           ./mole.exe analyze --json "$env:RUNNER_TEMP" > analyze.json
           Get-Content status.json | ConvertFrom-Json | Out-Null
           Get-Content analyze.json | ConvertFrom-Json | Out-Null
+          ./mole.exe clean --dry-run
+          ./mole.exe uninstall --list --json > apps.json
+          $apps = Get-Content apps.json -Raw | ConvertFrom-Json
+          if ($apps.Count -lt 1) { throw "uninstall --list found no apps on the runner" }
+          ./mole.exe uninstall --list
