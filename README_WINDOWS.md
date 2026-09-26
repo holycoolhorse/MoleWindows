@@ -1,13 +1,14 @@
 # Mole for Windows
 
-Mole on Windows is a single `mole.exe` with the two Go commands of the macOS CLI:
+Mole on Windows is a single `mole.exe`:
 
 | Command | What it does |
 | --- | --- |
 | `mole analyze [PATH]` | Disk explorer TUI. Sizes folders, lists large files, and moves selections to the **Recycle Bin**. `--json` prints the same scan as JSON. |
 | `mole status` | Live system health dashboard: CPU, memory, disks, network, battery, top processes. `--json` prints one snapshot, `--watch` streams NDJSON. |
+| `mole clean` | Removes rebuildable caches and temp files older than a day from your user profile. Shows a preview first; `--dry-run` changes nothing. |
 
-`clean`, `uninstall`, `purge`, `optimize`, and the other shell commands are macOS-only for now. `mole.exe` says so instead of pretending to run them.
+`uninstall`, `purge`, `optimize`, and the other shell commands are macOS-only for now. `mole.exe` says so instead of pretending to run them.
 
 ## Build
 
@@ -41,6 +42,23 @@ The JSON schemas match macOS. An overview scan reports `"overview": true` with `
 
 In `analyze`, arrow keys navigate, `Enter` opens a folder, `Space` selects, `Delete`/`Backspace` moves the selection to the Recycle Bin after you confirm with `Enter`, `O` opens with the default app, `F` shows it in File Explorer, `/` filters, `q` quits.
 
+## mole clean
+
+```powershell
+mole clean --dry-run   # preview only
+mole clean             # preview, then type y to delete
+mole clean --yes       # non-interactive (required when stdin is not a terminal)
+```
+
+It deletes permanently (caches rebuild themselves), inside these folders only, never the folders themselves:
+
+- **System temp:** `%TEMP%` files older than 1 day
+- **Windows caches:** INetCache, CrashDumps, Windows Error Reporting archive and queue
+- **Browsers:** Chrome, Edge, Brave `Cache`, `Code Cache`, `GPUCache`; Firefox `cache2`. Skipped while the browser runs; close it and run again.
+- **Developer:** npm `_cacache`, pip, Yarn, uv, Go build, NuGet HTTP cache
+
+Never touched: browser profiles (cookies, sessions, Local Storage), `~\.nuget\packages`, `~\.m2`, `~\.gradle`, Cargo sources, Explorer thumbnails, anything under `C:\Windows` (including Windows Update), the Recycle Bin, and OneDrive. No administrator rights are used. Files in use, files changed since the preview, links, and junctions are kept. Each deletion is logged to `%LOCALAPPDATA%\mole\logs\operations.log` (`MO_NO_OPLOG=1` turns it off).
+
 ## Safety
 
 - Deletes go to the Recycle Bin only; Mole never deletes permanently on its own. Paths on removable, network, or RAM volumes are refused, including items inside a folder where such a volume is mounted, or reached through a junction or symlink that leads to one (a link itself is recycled, not its target), because Windows would delete them permanently. If an item is too large for the Recycle Bin, Windows itself asks before deleting it permanently; answer No to keep it.
@@ -51,14 +69,15 @@ In `analyze`, arrow keys navigate, `Enter` opens a folder, `Space` selects, `Del
 
 # Windows için Mole
 
-Windows'ta Mole, macOS CLI'daki iki Go komutunu tek bir `mole.exe` içinde sunar:
+Windows'ta Mole tek bir `mole.exe` olarak gelir:
 
 | Komut | Ne yapar |
 | --- | --- |
 | `mole analyze [YOL]` | Disk gezgini TUI. Klasör boyutlarını ölçer, büyük dosyaları listeler ve seçimleri **Geri Dönüşüm Kutusu**'na taşır. `--json` aynı taramayı JSON olarak verir. |
 | `mole status` | Canlı sistem sağlığı paneli: CPU, bellek, diskler, ağ, pil, en çok kaynak kullanan işlemler. `--json` tek bir anlık görüntü, `--watch` NDJSON akışı verir. |
+| `mole clean` | Kullanıcı profilinizdeki yeniden oluşturulabilir önbellekleri ve 1 günden eski geçici dosyaları siler. Önce önizleme gösterir; `--dry-run` hiçbir şeyi değiştirmez. |
 
-`clean`, `uninstall`, `purge`, `optimize` ve diğer kabuk komutları şimdilik yalnızca macOS'ta. `mole.exe` bunları çalıştırıyormuş gibi yapmaz, desteklenmediğini söyler.
+`uninstall`, `purge`, `optimize` ve diğer kabuk komutları şimdilik yalnızca macOS'ta. `mole.exe` bunları çalıştırıyormuş gibi yapmaz, desteklenmediğini söyler.
 
 ## Derleme
 
@@ -91,6 +110,23 @@ mole status --watch --interval 2s
 JSON şemaları macOS ile aynıdır. Genel bakış taraması platformdan bağımsız bir işaret olarak `"overview": true` ve `"path": "/"` döndürür; her girdide gerçek Windows yolu bulunur.
 
 `analyze` içinde ok tuşları gezinir, `Enter` klasöre girer, `Space` seçer, `Delete`/`Backspace` seçimi `Enter` ile onayladıktan sonra Geri Dönüşüm Kutusu'na taşır, `O` varsayılan uygulamayla açar, `F` Dosya Gezgini'nde gösterir, `/` filtreler, `q` çıkar.
+
+## mole clean
+
+```powershell
+mole clean --dry-run   # yalnızca önizleme
+mole clean             # önizleme, sonra silmek için y yazın
+mole clean --yes       # etkileşimsiz (stdin terminal değilse zorunlu)
+```
+
+Kalıcı olarak siler (önbellekler kendiliğinden yeniden oluşur); yalnızca şu klasörlerin içini temizler, klasörlerin kendisini asla silmez:
+
+- **Sistem geçici dosyaları:** `%TEMP%` içindeki 1 günden eski dosyalar
+- **Windows önbellekleri:** INetCache, CrashDumps, Windows Hata Raporlama arşivi ve kuyruğu
+- **Tarayıcılar:** Chrome, Edge, Brave `Cache`, `Code Cache`, `GPUCache`; Firefox `cache2`. Tarayıcı açıkken atlanır; kapatıp tekrar çalıştırın.
+- **Geliştirici:** npm `_cacache`, pip, Yarn, uv, Go build, NuGet HTTP önbelleği
+
+Asla dokunulmaz: tarayıcı profilleri (çerezler, oturumlar, Local Storage), `~\.nuget\packages`, `~\.m2`, `~\.gradle`, Cargo kaynakları, Gezgin küçük resimleri, `C:\Windows` altındaki her şey (Windows Update dahil), Geri Dönüşüm Kutusu ve OneDrive. Yönetici izni kullanılmaz. Kullanımdaki dosyalar, önizlemeden sonra değişen dosyalar, bağlantılar ve junction'lar korunur. Her silme `%LOCALAPPDATA%\mole\logs\operations.log` dosyasına yazılır (`MO_NO_OPLOG=1` kapatır).
 
 ## Güvenlik
 
