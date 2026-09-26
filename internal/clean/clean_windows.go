@@ -16,6 +16,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -371,10 +372,8 @@ func runningProcessState(images []string) processState {
 	}
 	for {
 		name := strings.ToLower(windows.UTF16ToString(entry.ExeFile[:]))
-		for _, image := range images {
-			if name == image {
-				return processRunning
-			}
+		if slices.Contains(images, name) {
+			return processRunning
 		}
 		if err := windows.Process32Next(snap, &entry); err != nil {
 			if errors.Is(err, windows.ERROR_NO_MORE_FILES) {
