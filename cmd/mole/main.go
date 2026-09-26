@@ -51,6 +51,10 @@ func run(argv []string, stdout, stderr io.Writer) int {
 	case "analyze", "analyse":
 		os.Args = append([]string{prog + " analyze"}, rest...)
 		return runAnalyze()
+	case "clean":
+		if cleanSupported {
+			return runClean(rest)
+		}
 	case "status":
 		os.Args = append([]string{prog + " status"}, rest...)
 		status.Main()
@@ -65,7 +69,7 @@ func run(argv []string, stdout, stderr io.Writer) int {
 
 	if unsupportedCommands[cmd] {
 		_, _ = fmt.Fprintf(stderr, "%s %s is not available on this platform yet.\n", prog, cmd)
-		_, _ = fmt.Fprintf(stderr, "Available commands: analyze, status. Run '%s help' for details.\n", prog)
+		_, _ = fmt.Fprintf(stderr, "Available commands: analyze, clean, status. Run '%s help' for details.\n", prog)
 		return 1
 	}
 	_, _ = fmt.Fprintf(stderr, "Unknown command: %s\n", argv[1])
@@ -80,6 +84,7 @@ Usage: %s <command> [options]
 
 Commands:
   analyze [PATH]   Explore disk usage; move selections to the Recycle Bin
+  clean            Remove rebuildable caches and old temp files (--dry-run)
   status           Live system health dashboard (--json, --watch)
   version          Show the installed version
   help             Show this help message

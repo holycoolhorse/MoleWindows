@@ -18,8 +18,8 @@ func TestRunRoutesMetaCommands(t *testing.T) {
 		{"help", []string{"mole", "help"}, 0, "Commands:", ""},
 		{"dash help", []string{"mole", "--help"}, 0, "analyze [PATH]", ""},
 		{"version", []string{"mole", "--version"}, 0, "Mole version dev", ""},
-		{"asset file name is not echoed", []string{`C:\Tools\mole-windows-amd64.exe`, "clean"}, 1, "", "mole clean is not available"},
-		{"unsupported command", []string{"mole", "clean"}, 1, "", "mole clean is not available on this platform yet."},
+		{"asset file name is not echoed", []string{`C:\Tools\mole-windows-amd64.exe`, "purge"}, 1, "", "mole purge is not available"},
+		{"unsupported command", []string{"mole", "purge"}, 1, "", "mole purge is not available on this platform yet."},
 		{"unknown command", []string{"mole", "frobnicate"}, 1, "", "Unknown command: frobnicate"},
 	}
 	for _, tt := range tests {

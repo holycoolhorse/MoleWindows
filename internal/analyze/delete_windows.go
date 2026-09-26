@@ -257,6 +257,12 @@ func validateWindowsPathShape(path string) error {
 	return nil
 }
 
+// IsProtectedPath exposes the Windows protected-path policy to the other
+// Windows commands (clean), so every delete surface refuses the same paths.
+func IsProtectedPath(path string) bool {
+	return isProtectedAnalyzeDeletePath(path)
+}
+
 func isProtectedAnalyzeDeletePath(path string) bool {
 	if path == "" {
 		return false
