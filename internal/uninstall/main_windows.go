@@ -61,7 +61,9 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	asJSON := flags.Bool("json", false, "")
 	dryRun := flags.Bool("dry-run", false, "")
 	yes := flags.Bool("yes", false, "")
-	if err := flags.Parse(args); err != nil {
+	// Options may follow the name ("mole uninstall Foo --dry-run"); the flag
+	// package stops at the first name, which would silently drop --dry-run.
+	if err := flags.Parse(optionsFirst(args)); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			_, _ = fmt.Fprint(stdout, usageText)
 			return 0
@@ -262,4 +264,22 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return string(r[:n-1]) + "…"
+}
+
+// optionsFirst moves every "-x" argument ahead of the positional ones, keeping
+// both in order. "--" ends option parsing as usual.
+func optionsFirst(args []string) []string {
+	var opts, names []string
+	for i, a := range args {
+		if a == "--" {
+			names = append(names, args[i+1:]...)
+			break
+		}
+		if strings.HasPrefix(a, "-") && a != "-" {
+			opts = append(opts, a)
+		} else {
+			names = append(names, a)
+		}
+	}
+	return append(append(opts, "--"), names...)
 }
