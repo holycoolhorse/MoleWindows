@@ -4,11 +4,13 @@ package uninstall
 
 import (
 	"bytes"
+	"io"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 type fakeSystem struct {
@@ -172,5 +174,27 @@ func TestReadInstalledAppsRuns(t *testing.T) {
 		if a.Name == "" || a.Key == "" {
 			t.Fatalf("filtered entry without name or key: %+v", a)
 		}
+	}
+}
+
+func TestWaitForRemovalPollsUntilGone(t *testing.T) {
+	origRead, origSleep := readAppsFunc, sleepFunc
+	defer func() { readAppsFunc, sleepFunc = origRead, origSleep }()
+	polls := 0
+	readAppsFunc = func() []App {
+		polls++
+		if polls < 3 {
+			return []App{{Key: "Steam App 1", Name: "Game"}}
+		}
+		return nil
+	}
+	sleeps := 0
+	sleepFunc = func(time.Duration) { sleeps++ }
+	waitForRemoval(io.Discard, App{Key: "steam app 1"}, time.Minute)
+	if polls != 3 || sleeps != 2 {
+		t.Fatalf("polls=%d sleeps=%d, want 3 and 2", polls, sleeps)
+	}
+	if !isSteamURI(`"C:\Steam\steam.exe" steam://uninstall/728880`) || isSteamURI(`msiexec /x {X}`) {
+		t.Fatal("isSteamURI misclassified")
 	}
 }
