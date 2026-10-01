@@ -4,8 +4,8 @@ package uninstall
 
 import (
 	"bytes"
-	"io"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
