@@ -41,6 +41,17 @@ func run(argv []string, stdout, stderr io.Writer) int {
 	// subcommands' own help already says "mole".
 	const prog = "mole"
 	if len(argv) < 2 {
+		if isTerminal(os.Stdin) && isTerminal(os.Stdout) {
+			choice, err := runMenu(os.Stdin, os.Stdout)
+			if err != nil {
+				_, _ = fmt.Fprintf(stderr, "menu: %v\n", err)
+				return 1
+			}
+			if choice == "" {
+				return 0
+			}
+			return run([]string{argv[0], choice}, stdout, stderr)
+		}
 		printUsage(stdout, prog)
 		return 0
 	}
