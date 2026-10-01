@@ -119,6 +119,7 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	log := oplog.Open("clean")
 	defer log.Close()
+	prog := newProgress(stdout, total, count)
 	var freed int64
 	var removed, failed int
 	var failures []string
@@ -127,13 +128,14 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		if p.skipReason != "" {
 			continue
 		}
-		r := executePlan(p, log)
+		r := executePlan(p, log, prog)
 		freed += r.freed
 		removed += r.removed
 		failed += len(r.failures)
 		failures = append(failures, r.failures...)
 	}
 
+	prog.finish()
 	_, _ = fmt.Fprintf(stdout, "\nFreed %s (%s removed).\n", units.BytesSI(freed), fileCount(removed))
 	if failed > 0 {
 		_, _ = fmt.Fprintf(stdout, "%s in use or changed since the scan; kept.\n", fileCount(failed))
@@ -245,7 +247,7 @@ type execResult struct {
 // executePlan deletes one target's files. Each file is revalidated right
 // before removal: still a regular file (not a reparse point), unchanged since
 // the scan, lexically and physically inside the root, and not protected.
-func executePlan(p *targetPlan, log *oplog.Log) execResult {
+func executePlan(p *targetPlan, log *oplog.Log, prog *progress) execResult {
 	var r execResult
 	dirFinal := map[string]string{}
 	inside := func(path string) bool {
@@ -265,6 +267,7 @@ func executePlan(p *targetPlan, log *oplog.Log) execResult {
 	}
 
 	for _, c := range p.files {
+		prog.advance(p.name, c.size)
 		info, err := os.Lstat(c.path)
 		switch {
 		case err != nil:
@@ -300,6 +303,64 @@ func executePlan(p *targetPlan, log *oplog.Log) execResult {
 		_ = os.Remove(dir)
 	}
 	return r
+}
+
+// progress draws one self-overwriting status line while files are deleted. It
+// is nil (and every method a no-op) when stdout is not a console, so logs and
+// pipes never see carriage returns.
+type progress struct {
+	w          io.Writer
+	totalBytes int64
+	totalFiles int
+	doneBytes  int64
+	doneFiles  int
+	last       time.Time
+	drawn      bool
+}
+
+func newProgress(w io.Writer, totalBytes int64, totalFiles int) *progress {
+	f, ok := w.(*os.File)
+	if !ok {
+		return nil
+	}
+	var mode uint32
+	if windows.GetConsoleMode(windows.Handle(f.Fd()), &mode) != nil {
+		return nil
+	}
+	return &progress{w: w, totalBytes: totalBytes, totalFiles: totalFiles}
+}
+
+// advance records one file as processed and redraws at most every 100ms.
+func (p *progress) advance(name string, size int64) {
+	if p == nil {
+		return
+	}
+	p.doneBytes += size
+	p.doneFiles++
+	t := time.Now()
+	if t.Sub(p.last) < 100*time.Millisecond && p.doneFiles < p.totalFiles {
+		return
+	}
+	p.last = t
+	pct := 100
+	if p.totalBytes > 0 {
+		pct = int(min(p.doneBytes*100/p.totalBytes, 100))
+	}
+	line := fmt.Sprintf("  Deleting %3d%%  %s / %s  %d/%d files  %s",
+		pct, units.BytesSI(p.doneBytes), units.BytesSI(p.totalBytes), p.doneFiles, p.totalFiles, name)
+	if len(line) > 78 {
+		line = line[:78]
+	}
+	_, _ = fmt.Fprintf(p.w, "\r%-78s", line)
+	p.drawn = true
+}
+
+// finish erases the status line.
+func (p *progress) finish() {
+	if p == nil || !p.drawn {
+		return
+	}
+	_, _ = fmt.Fprintf(p.w, "\r%-78s\r", "")
 }
 
 func fileCount(n int) string {

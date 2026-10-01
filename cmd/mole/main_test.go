@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestRunRoutesMetaCommands(t *testing.T) {
@@ -36,5 +38,34 @@ func TestRunRoutesMetaCommands(t *testing.T) {
 				t.Fatalf("stderr %q does not contain %q", stderr.String(), tt.wantStderr)
 			}
 		})
+	}
+}
+
+func TestMenuModelNavigation(t *testing.T) {
+	key := func(s string) tea.KeyMsg {
+		if s == "enter" {
+			return tea.KeyMsg{Type: tea.KeyEnter}
+		}
+		if s == "down" {
+			return tea.KeyMsg{Type: tea.KeyDown}
+		}
+		return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
+	}
+	var m tea.Model = menuModel{}
+	m, _ = m.Update(key("down"))
+	m, _ = m.Update(key("enter"))
+	if got := m.(menuModel).choice; got != "uninstall" {
+		t.Fatalf("choice = %q, want uninstall", got)
+	}
+	m, _ = menuModel{}.Update(key("4"))
+	if got := m.(menuModel).choice; got != "status" {
+		t.Fatalf("choice = %q, want status", got)
+	}
+	m, _ = menuModel{}.Update(key("q"))
+	if got := m.(menuModel).choice; got != "" {
+		t.Fatalf("quit chose %q", got)
+	}
+	if !strings.Contains(menuModel{}.View(), "1. Clean") {
+		t.Fatal("view lacks Clean entry")
 	}
 }
