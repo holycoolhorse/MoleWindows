@@ -166,7 +166,7 @@ func TestCleanKeepsFilesChangedAfterScan(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := range plans {
-		executePlan(&plans[i], &oplog.Log{})
+		executePlan(&plans[i], &oplog.Log{}, nil)
 	}
 	if !exists(changed) {
 		t.Fatal("a file rewritten after the scan must be kept")

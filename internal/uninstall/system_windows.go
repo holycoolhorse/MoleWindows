@@ -68,6 +68,14 @@ func readInstalledApps() []App {
 func runUninstaller(program, cmdline string) error {
 	cmd := exec.Command(program)
 	cmd.SysProcAttr = &syscall.SysProcAttr{CmdLine: cmdline}
+	if isSteamURI(cmdline) {
+		// steam.exe may be the whole Steam client when Steam is not running,
+		// so waiting for it to exit could block until Steam is closed.
+		if err := cmd.Start(); err != nil {
+			return err
+		}
+		return cmd.Process.Release()
+	}
 	err := cmd.Run()
 	if err == nil {
 		return nil

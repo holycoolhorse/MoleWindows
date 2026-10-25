@@ -12,6 +12,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/sys/windows"
 
@@ -38,6 +39,7 @@ var (
 	readAppsFunc     = readInstalledApps
 	runUninstallFunc = runUninstaller
 	recycleFunc      = analyze.MoveToRecycleBin
+	sleepFunc        = time.Sleep
 	isProtectedPath  = analyze.IsProtectedPath
 	stdinIsTerminal  = func() bool {
 		var mode uint32
@@ -149,9 +151,16 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	log := oplog.Open("uninstall")
 	defer log.Close()
 	log.Write("ran", cmdline, 0)
+	_, _ = fmt.Fprintln(stdout, "\nRunning the uninstaller; finish any dialog it opens...")
 	if err := runUninstallFunc(program, cmdline); err != nil {
 		_, _ = fmt.Fprintf(stderr, "The uninstaller for %s did not finish: %v\nLeftovers were not touched.\n", app.Name, err)
 		return 1
+	}
+	if isSteamURI(cmdline) {
+		// Steam hands the request to its own window and returns at once, so
+		// wait until the app's registry entry disappears.
+		_, _ = fmt.Fprintln(stdout, "Steam asks for confirmation in its own window. Confirm it there; Mole waits (Ctrl+C to stop).")
+		waitForRemoval(stdout, app, steamWait)
 	}
 
 	remaining := filterApps(readAppsFunc())
@@ -187,6 +196,44 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	_, _ = fmt.Fprintf(stdout, "Moved %d of %d leftover folders to the Recycle Bin.\n", len(leftovers)-failed, len(leftovers))
 	return 0
+}
+
+// steamWait bounds how long Mole waits for Steam's own confirmation dialog.
+const steamWait = 10 * time.Minute
+
+// isSteamURI reports whether the uninstaller is a steam:// request.
+func isSteamURI(cmdline string) bool {
+	return strings.Contains(strings.ToLower(cmdline), "steam://uninstall/")
+}
+
+// waitForRemoval polls until app's registry entry is gone or limit passes,
+// drawing an elapsed-time line when stdout is a console.
+func waitForRemoval(w io.Writer, app App, limit time.Duration) {
+	console := false
+	if f, ok := w.(*os.File); ok {
+		var mode uint32
+		console = windows.GetConsoleMode(windows.Handle(f.Fd()), &mode) == nil
+	}
+	const step = 2 * time.Second
+	for elapsed := time.Duration(0); elapsed < limit; elapsed += step {
+		gone := true
+		for _, a := range filterApps(readAppsFunc()) {
+			if strings.EqualFold(a.Key, app.Key) {
+				gone = false
+				break
+			}
+		}
+		if gone {
+			break
+		}
+		if console {
+			_, _ = fmt.Fprintf(w, "\r  Waiting for Steam... %d:%02d", int(elapsed.Minutes()), int(elapsed.Seconds())%60)
+		}
+		sleepFunc(step)
+	}
+	if console {
+		_, _ = fmt.Fprintf(w, "\r%-40s\r", "")
+	}
 }
 
 // keepUnprotected drops candidates the Windows protected-path policy refuses.
